@@ -1,33 +1,38 @@
 #!/usr/bin/env bash
-# Sets up the web servers for the deployment of web_static
+# Sets up a web server for deployment of web_static.
 
-# Make sure nginx is installed
-sudo apt -y update;
-sudo apt install -y nginx
+apt-get update
+apt-get install -y nginx
 
-sudo mkdir -p /data/web_static/releases/test/
-sudo mkdir -p /data/web_static/shared/
+mkdir -p /data/web_static/releases/test/
+mkdir -p /data/web_static/shared/
+echo "Holberton School" > /data/web_static/releases/test/index.html
+ln -sf /data/web_static/releases/test/ /data/web_static/current
 
-# Test file to see if everything works correctly
-sudo touch /data/web_static/releases/test/index.html
-sudo echo "<html>
-  <head>
-  </head>
-  <body>
-    ALX hbnb clone goes here...
-  </body>
-    </html>" | sudo tee  /data/web_static/releases/test/index.html
+chown -R ubuntu /data/
+chgrp -R ubuntu /data/
 
-# Create a symlink, recreate it if it exists
+printf %s "server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    add_header X-Served-By $HOSTNAME;
+    root   /var/www/html;
+    index  index.html index.htm;
 
-sudo ln -sf /data/web_static/releases/test/ /data/web_static/current
+    location /hbnb_static {
+        alias /data/web_static/current;
+        index index.html index.htm;
+    }
 
-# Change all ownership of folders and files inside /data to ubuntu
-sudo chown -R ubuntu:ubuntu /data
+    location /redirect_me {
+        return 301 http://cuberule.com/;
+    }
 
-# Update the Nginx configuration to serve the content of /data/web_static/current/ to hbnb_static
-new_location="\tserver_name _;\n\tlocation /hbnb_static {\n\t\talias /data/web_static/current/;\n\t\}\n"
+    error_page 404 /404.html;
+    location /404 {
+      root /var/www/html;
+      internal;
+    }
+}" > /etc/nginx/sites-available/default
 
-sudo sed -i "s-\tserver_name _;-$new_location-" /etc/nginx/sites-available/default
-sudo sed -i "s-\tserver_name _;-$new_location-" /etc/nginx/sites-enabled/default
-sudo service nginx restart
+service nginx restart

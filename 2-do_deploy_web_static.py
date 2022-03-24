@@ -1,68 +1,49 @@
 #!/usr/bin/python3
-'''Module 2-do_deploy_web_static
-Distributes an archive to your web servers, using do_deploy()
-'''
-from fabric.api import *
-import os
-from fabric.api import settings
+# Fabfile to distribute an archive to a web server.
+import os.path
+from fabric.api import env
+from fabric.api import put
+from fabric.api import run
 
-env.hosts = ['18.232.153.3', '34.236.33.185']
-
-
-class FabricException(Exception):
-    '''Fake wrapper class to handle Fabric run() aborts as Python exceptions'''
-    pass
+env.hosts = ["104.196.168.90", "35.196.46.172"]
 
 
 def do_deploy(archive_path):
-    '''Calls do_deploy_run and returns either True or
-    False if an exception is raised'''
-    with settings(abort_exception=FabricException):
-        try:
-            returned = do_deploy_run(archive_path)
-        except Exception or FabricException:
-            # print("Exception caught, returned false")
-            return False
-    if returned is False:
-        # print("Function returned false")
+    """Distributes an archive to a web server.
+
+    Args:
+        archive_path (str): The path of the archive to distribute.
+    Returns:
+        If the file doesn't exist at archive_path or an error occurs - False.
+        Otherwise - True.
+    """
+    if os.path.isfile(archive_path) is False:
         return False
-    # print("Function returned True")
-    return True
+    file = archive_path.split("/")[-1]
+    name = file.split(".")[0]
 
-
-def do_deploy_run(archive_path):
-    '''Deploys archive to remote servers'''
-    # Archive's name without the .tgz extension
-    archive_name = archive_path[9:-4]
-
-    # print("Archive path:", os.getcwd() + '/' + archive_path)
-    # Return false if the archive doesn't exist
-    if not os.path.isfile(os.getcwd() + '/' + archive_path):
+    if put(archive_path, "/tmp/{}".format(file)).failed is True:
         return False
-
-    # Upload the archive to remote servers
-    put(archive_path, "/tmp/")
-    # If a folder with the same archive name exists, remvoe it
-    run('sudo rm -rf -- /data/web_static/releases/' + archive_name)
-
-    run('sudo mkdir -p /data/web_static/releases/' + archive_name)
-
-    # Extract the archive's contents to
-    # /data/web_static/releases/<archive_name>
-    run('sudo tar -xzf /tmp/' + archive_path[9:] +
-        ' -C /data/web_static/releases/' + archive_name)
-    # Move the contents of the extracted archive to its parent folder
-    run('sudo mv -f /data/web_static/releases/'
-        + archive_name + '/web_static/* '
-        + '/data/web_static/releases/' + archive_name)
-    run('sudo rm -rf /data/web_static/releases/'
-        + archive_name + '/web_static/')
-    run('sudo rm /tmp/' + archive_path[9:])
-
-    # '''
-    # Remove the symbolic link if it exists
-    run('sudo rm -f -- /data/web_static/current')
-    run('sudo ln -sf /data/web_static/releases/'
-        + archive_path[9:-4] + ' /data/web_static/current')
+    if run("rm -rf /data/web_static/releases/{}/".
+           format(name)).failed is True:
+        return False
+    if run("mkdir -p /data/web_static/releases/{}/".
+           format(name)).failed is True:
+        return False
+    if run("tar -xzf /tmp/{} -C /data/web_static/releases/{}/".
+           format(file, name)).failed is True:
+        return False
+    if run("rm /tmp/{}".format(file)).failed is True:
+        return False
+    if run("mv /data/web_static/releases/{}/web_static/* "
+           "/data/web_static/releases/{}/".format(name, name)).failed is True:
+        return False
+    if run("rm -rf /data/web_static/releases/{}/web_static".
+           format(name)).failed is True:
+        return False
+    if run("rm -rf /data/web_static/current").failed is True:
+        return False
+    if run("ln -s /data/web_static/releases/{}/ /data/web_static/current".
+           format(name)).failed is True:
+        return False
     return True
-    # '''
